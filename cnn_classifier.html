@@ -1,0 +1,31 @@
+﻿<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>CNN Object Classifier</title>
+<link rel="icon" href="nn.ico">
+</head>
+<STYLE TYPE="text/css">  
+    BODY {margin: 50pt}  
+ </STYLE>
+<body background="images/background.gif">
+<font size="6">
+<p align="center">CNN Object Classifier</p></font>
+<font size="5">
+<p>This is a project I implement on the KeJia Robot to improve its capability of object recognition. This project is a part of my master thesis [<u><a href="PDF/master_thesis.pdf">PDF</a></u>(Chinese)]. As a service robot, KeJia needs to be able to recognize specific objects from very limited training data. One of the most efficient way to achieve this is the Convolutional Neural Network (CNN), a deep learning technology that develops rapidly in the past few years. I adapt the famous <a href="http://www.robots.ox.ac.uk/~vgg/research/very_deep/">VGG-16</a> proposed by Visual Geometry Group in University of Oxford, which won the first place in ImageNet contest 2014. It is a deep network composed of a series of convolutional layers and maxpooling layers, ends with three full-connected layers. In each convolutional layer, the input is convoluted with a 3 x 3 filter, added to a bias, and passes through a rectified linear unit (ReLU) function. Since the robot does not need to recognize as many classes of objects as the ImageNet (which is 1000), the dimensions of the full-connected layers are reduced to save time and memory. I choose <a href="https://www.tensorflow.org/">TensorFlow</a> as the neural network library.</p>
+<p align="center"><a href="images/modified_vgg16.jpg"><img src="images/modified_vgg16.jpg" width="1000"></a></p>
+<p align="center">Network architecture (click for higher resolution)</p>
+<p>The training set is composed with images taken by the cameras of the KeJia Robot. The robot has two image sensors, a kinect and a high resolution RGB camera. After being calibrated using a "chessboard", correspondence between the two images could be established. The objects are placed on a table and pictures are taken from numerous aspects. With the convenient functionalities provided by the <a href="http://pointclouds.org/">Point Cloud Library (PCL)</a>, the point cloud could be easily segmented into background and objects. Then objects could be cropped from the high resolution images. In practice, the training set contains about 100 images for each object to be trained.</p>
+<p align="center"><a href="images/training_set.jpg"><img src="images/training_set.jpg" width="700"></a></p>
+<p align="center">Some images from the training set (click for full resolution)</p>
+<p>Before being fed to the network, the input images are distorted randomly to prevent overfitting. Each image is flipped randomly, the brightness and contrast are adjust randomly, and  cropped randomly to square before being resized to 224 x 224 pixels. Weights of convolutional layers are loaded from <a href="https://github.com/tensorflow/models/tree/master/slim">model</a> pretrained on the <a href="http://www.image-net.org/challenges/LSVRC/2012/">ILSVRC2012</a> dataset, which makes the network efficiently extract features from images. The weights of the full-connected layers are trained by the Adam Optimizer to minimize the cross entropy. On NVIDIA GTX 1060 3GB with CUDA 8.0, CUDNN 5.1, and TensorFlow 1.1.0, The training process consumes about 35ms per image in one epoch.</p>
+<p align="center"><a href="images/features.jpg"><img src="images/features.jpg" width="1000"></a></p>
+<p align="center">Some of the extracted features by convolutional layers of VGG16 (click for full resolution)</p>
+<p>When the robot recognizes objects, images of candidates are cropped in the same method as how the training data is gathered. The robot might encounter objects that do not present in the training set, so the confidence of the recognition results needs to be measured. This is calculated by following the criteria that a confident prediction is such prediction that one score in the output vector is significantly higher than others. The output of the network is normalized to a probability distribution by softmax function, then the Shannon entropy of the distribution is calculated. Only predictions that have entropy lower than an empirical threshold are considered valid.</p>
+<p align="center"><img src="images/confidence.jpg" width="1200"></p>
+<p align="center">Examples of confident and unconfident prediction (10 classes)</p>
+<p>In practice, if high-end GPU is available, each input image would be recognized multiple times. Valid predictions vote on the final decision. If one of the classes has sufficient votes, it would be the final recognition result, otherwise the input image is labeled as an unknown object.</p>
+<p align="center"><img src="images/recognition.png" width="1200"></p>
+<p align="center">An example of real-time recognition</p>
+<p align="center"><a href="research.html">Back to Research</a></p>
+</font>
+</body>
+</html>

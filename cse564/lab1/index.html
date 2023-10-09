@@ -1,0 +1,521 @@
+<!doctype html>
+<!--
+     author: Zekun Zhang
+      email: zekun.zhang@stonybrook.edu
+    created: Feb. 2019
+-->
+<html>
+<title>2000 Presidential Election Florida County Voting</title>
+<head>
+    <script src="https://d3js.org/d3.v4.js"></script>
+    <script src="http://d3js.org/topojson.v1.js"></script>
+</head>
+
+<body>
+<svg width="1400" height="800"></svg>
+<script>
+
+    var generate = function(county, votes) {
+        return {
+            "county": county,
+            "votes": [
+                { "candidate": "GORE", "no": votes[0], "index": 0 },
+                { "candidate": "BUSH", "no": votes[1], "index": 1 },
+                { "candidate": "BUCHANAN", "no": votes[2], "index": 2 },
+                { "candidate": "NADER", "no": votes[3], "index": 3 },
+                { "candidate": "BROWNE", "no": votes[4], "index": 4 },
+                { "candidate": "HAGELIN", "no": votes[5], "index": 5 },
+                { "candidate": "HARRIS", "no": votes[6], "index": 6 },
+                { "candidate": "MCREYNOLDS", "no": votes[7], "index": 7 },
+                { "candidate": "MOOREHEAD", "no": votes[8], "index": 8 },
+                { "candidate": "PHILLIPS", "no": votes[9], "index": 9 }
+            ],
+            "total": votes[10]
+        }
+    }
+
+    var florida_votes = [
+        generate("ALACHUA", [47300,34062,262,3215,658,42,4,658,21,20,86242]),
+        generate("BAKER", [2392,5610,73,53,17,3,0,0,3,3,8154]),
+        generate("BAY", [18850,38637,248,828,171,18,5,3,37,18,58815]),
+        generate("BRADFORD", [3072,5413,65,84,28,2,0,0,3,2,8669]),
+        generate("BREVARD", [97318,115185,570,4470,643,39,11,11,76,72,218395]),
+        generate("BROWARD", [386518,177279,789,7099,1212,128,49,35,123,74,573306]),
+        generate("CALHOUN", [2155,2873,90,39,10,1,0,1,3,2,5174]),
+        generate("CHARLOTTE", [29641,35419,182,1461,127,15,6,3,12,19,66885]),
+        generate("CITRUS", [25501,29744,270,1378,194,16,5,0,28,18,57154]),
+        generate("CLAY", [14630,41745,186,562,204,14,1,3,9,6,57360]),
+        generate("COLLIER", [29905,60426,122,1400,185,34,7,4,29,10,92122]),
+        generate("COLUMBIA", [7047,10964,89,258,127,7,1,2,5,8,18508]),
+        generate("MIAMI-DADE", [328702,289456,561,5355,759,119,88,36,124,69,625269]),
+        generate("DE SOTO", [3322,4256,36,157,23,0,0,3,2,8,7807]),
+        generate("DIXIE", [1825,2698,29,75,32,2,0,0,2,3,4666]),
+        generate("DUVAL", [107680,152082,650,2752,954,160,36,16,41,57,264428]),
+        generate("ESCAMBIA", [40958,73029,504,1729,297,24,6,3,20,110,116680]),
+        generate("FLAGLER", [13891,12608,83,435,60,4,1,3,12,3,27100]),
+        generate("FRANKLIN", [2042,2448,33,85,17,3,1,0,2,3,4634]),
+        generate("GADSDEN", [9565,4750,39,139,24,4,7,3,12,6,14549]),
+        generate("GILCHRIST", [1910,3300,29,97,52,1,0,0,4,2,5395]),
+        generate("GLADES", [1420,1840,9,56,12,3,0,1,1,0,3342]),
+        generate("GULF", [2389,3546,71,86,21,4,2,2,9,2,6132]),
+        generate("HAMILTON", [1718,2153,24,39,11,2,6,9,4,7,3973]),
+        generate("HARDEE", [2341,3764,30,75,17,2,0,0,3,2,6234]),
+        generate("HENDRY", [3239,4743,22,103,11,1,3,2,2,7,8133]),
+        generate("HERNANDO", [32644,30646,242,1501,116,26,8,4,22,10,65219]),
+        generate("HIGHLANDS", [14152,20196,99,409,51,14,5,3,7,5,34941]),
+        generate("HILLSBOROUGH", [166581,176967,836,7348,1104,215,35,29,150,66,353331]),
+        generate("HOLMES", [2154,4985,76,91,18,7,1,3,2,6,7343]),
+        generate("INDIAN RIVER", [19769,28627,105,950,123,13,4,2,10,13,49616]),
+        generate("JACKSON", [6868,9138,102,138,40,2,0,1,7,4,16300]),
+        generate("JEFFERSON", [3038,2481,29,76,14,1,2,1,0,0,5642]),
+        generate("LAFAYETTE", [788,1669,10,26,6,0,3,1,0,1,2504]),
+        generate("LAKE", [36555,49963,289,1459,203,36,4,1,14,21,88545]),
+        generate("LEE", [73560,106141,305,3587,538,81,30,5,96,34,184377]),
+        generate("LEON", [61425,39053,282,1932,330,28,9,7,31,16,103113]),
+        generate("LEVY", [5403,6860,67,284,92,1,1,1,11,10,12730]),
+        generate("LIBERTY", [1011,1316,39,19,12,3,0,0,2,1,2403]),
+        generate("MADISON", [3011,3038,29,54,18,2,0,1,5,1,6159]),
+        generate("MANATEE", [49169,57948,272,2489,243,35,5,3,26,19,110209]),
+        generate("MARION", [44648,55135,563,1810,361,26,14,6,49,22,102634]),
+        generate("MARTIN", [26619,33864,108,1075,105,29,13,8,12,19,61852]),
+        generate("MONROE", [16483,16059,47,1090,162,26,1,0,7,3,33878]),
+        generate("NASSAU", [6952,16404,90,255,63,8,0,4,3,3,23782]),
+        generate("OKALOOSA", [16924,52043,267,984,313,15,4,2,20,33,70605]),
+        generate("OKEECHOBEE", [4588,5058,43,131,21,4,1,1,4,3,9854]),
+        generate("ORANGE", [140115,134476,446,3881,892,65,13,7,45,41,279981]),
+        generate("OSCEOLA", [28177,26216,145,732,309,21,10,5,33,10,55658]),
+        generate("PALM BEACH", [268945,152846,3407,5564,743,143,45,302,103,188,432286]),
+        generate("PASCO", [69550,68581,570,3392,412,82,18,14,77,17,142713]),
+        generate("PINELLAS", [199660,184312,1010,9986,1222,444,40,27,167,70,396938]),
+        generate("POLK", [74977,90101,538,2060,365,59,8,5,36,46,168195]),
+        generate("PUTNAM", [12091,13439,147,379,114,7,2,4,12,10,26205]),
+        generate("ST. JOHNS", [19482,39497,229,1214,210,11,4,2,13,12,60674]),
+        generate("ST. LUCIE", [41559,34705,124,1368,165,12,4,10,29,13,77989]),
+        generate("SANTA ROSA", [12795,36248,311,723,131,13,1,1,19,43,50285]),
+        generate("SARASOTA", [72854,83100,305,4066,431,94,11,5,59,15,160940]),
+        generate("SEMINOLE", [58888,75293,194,1940,551,38,38,5,70,27,137044]),
+        generate("SUMTER", [9634,12126,114,307,53,2,2,0,17,3,22258]),
+        generate("SUWANNEE", [4084,8014,108,182,53,4,2,0,5,9,12461]),
+        generate("TAYLOR", [2647,4051,27,59,4,3,0,1,1,8,6801]),
+        generate("UNION", [1399,2326,26,29,13,0,1,0,0,0,3794]),
+        generate("VOLUSIA", [97063,82214,396,2436,3211,33,9888,3,59,2927,198230]),
+        generate("WAKULLA", [3835,4511,46,149,30,3,2,1,6,0,8583]),
+        generate("WALTON", [5637,12176,120,265,68,11,3,2,18,7,18307]),
+        generate("WASHINGTON", [2796,4983,88,93,32,20,0,0,5,9,8026])
+    ]
+    var county_idx = 0
+
+    var top_margin = 150
+    var side_margin = 200
+    var svg = d3.select("svg")
+    var svg_width = svg.attr("width")
+    var svg_height = svg.attr("height")
+    var g_width = 600
+    var g_height = svg_height - 2 * top_margin
+    var bar_width = 30
+
+    svg.append("text")
+        .attr("x", side_margin + g_width / 2)
+        .attr("y", 50)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "36px")
+        .text("2000 Presidential Election Florida County Voting")
+
+
+    function create_bar_chart() {
+        // bar chart 600 x 500
+        var g = svg.append("g")
+            .attr("class", "bar_chart")
+            .attr("transform", "translate(" + side_margin + "," + top_margin + ")")
+
+        var x = d3.scaleBand().range([0, g_width])
+        var y = d3.scaleLinear().range([g_height, 0])
+
+        var data = florida_votes[county_idx]
+
+        x.domain(data["votes"].map( function(d) { return d["candidate"]; } ))
+        y.domain([0, d3.max(data["votes"], function(d) { return d["no"]; })]);
+
+        g.append("g")
+            .attr("transform", "translate(0," + g_height + ")")
+            .call(d3.axisBottom(x))
+            .selectAll("text")
+            .attr("x", -10)
+            .attr("y", 0)
+            .attr("dy", ".35em")
+            .attr("transform", "rotate(-90)")
+            .style("text-anchor", "end")
+
+        g.append("g")
+            .append("text")
+            .attr("x", g_width / 2)
+            .attr("y", g_height + 100)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "24px")
+            .text("candidates")
+
+        g.append("g")
+            .call(d3.axisLeft(y))
+
+        g.append("g")
+            .append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("x", g_height / -2)
+            .attr("y", -60)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "24px")
+            .text("votes");
+
+        function get_bar_height(val) {
+            return val * g_height * 1.0 / y.domain()[1]
+        }
+
+        g.selectAll(".bar")
+            .data(data["votes"])
+            .enter().append("rect")
+            .attr("class", "bar")
+            .on("mouseover", onMouseOverBar)
+            .on("mouseout", onMouseOutBar)
+            .attr("x", function(d) { return d["index"] * 60 + 30 - bar_width / 2; })
+            .attr("y", function(d) { return g_height - get_bar_height(d["no"]); })
+            .attr("width", bar_width)
+            .attr("fill", "#0099FF")
+            .transition().duration(500)
+            .attr("height", function(d) { return get_bar_height(d["no"]); })
+
+        bar_width_reserve = bar_width
+
+        function onMouseOverBar(d, i) {
+            bar_width_reserve = d3.select(this).attr("width")
+            var bar_width = Number(bar_width_reserve) + 10
+
+            d3.select(this)
+                .transition().duration(500)
+                .attr("x", function(d) { return d["index"] * 60 + 30 - bar_width / 2; })
+                .attr("y", function(d) { return g_height - (10 + get_bar_height(d["no"])); })
+                .attr("width", bar_width)
+                .attr("height", function(d) { return 10 + get_bar_height(d["no"]); })
+                .attr("fill", "#99FF99")
+
+            g.append("text")
+                .attr("class", "bar_value")
+                .attr("x", function() { return d["index"] * 60 + 30; })
+                .transition().duration(500)
+                .attr("y", function() { return g_height - (20 + get_bar_height(d["no"])); })
+                .text( function() { return d["no"]; })
+                .attr("text-anchor", "middle")
+        }
+
+        function onMouseOutBar(d, i) {
+            d3.select(this)
+                .transition().duration(500)
+                .attr("x", function(d) { return d["index"] * 60 + 30 - bar_width_reserve / 2; })
+                .attr("y", function(d) { return g_height - get_bar_height(d["no"]); })
+                .attr("width", bar_width_reserve)
+                .attr("height", function(d) { return get_bar_height(d["no"]); })
+                .attr("fill", "#0099FF")
+
+            d3.selectAll(".bar_value")
+                .remove()
+        }
+    }
+
+    function create_pie_chart() {
+        var pie_colors = [
+            "#0055FF", "#FF3333", "#FF8000", "#FFFF00", "#80FF00",
+            "#33FF33", "#80FF00", "#00FF00", "#FFFF66", "#FFFF99"]
+        var data = florida_votes[county_idx]
+        for(var i = 0; i < data["votes"].length; i ++) {
+            data["votes"][i]["percent"] = data["votes"][i]["no"] / data["total"]
+            data["votes"][i]["color"] = pie_colors[i]
+        }
+        data["votes"][0]["start"] = 0.35
+        for(var i = 1; i < data["votes"].length; i ++) {
+            data["votes"][i]["start"] = data["votes"][i - 1]["start"] + data["votes"][i - 1]["percent"]
+        }
+
+        var radius = 80 + 100 * (data["total"] - 2403) / 622866
+        var arc = d3.arc()
+
+        // pie chart 600 x 500
+        var g = svg.append("g")
+            .attr("class", "pie_chart")
+            .attr("transform", "translate(" + side_margin + "," + top_margin + ")")
+
+        g.selectAll(".path")
+            .data(data["votes"])
+            .enter().append("path")
+            .attr("transform", "translate(300,300)")
+            .on("mouseover", onMouseOverPie)
+            .on("mouseout", onMouseOutPie)
+            .attr("d", function(d) {
+                return arc({
+                innerRadius: 0,
+                outerRadius: radius,
+                startAngle: d["start"] * Math.PI * 2,
+                endAngle: (d["start"] + d["percent"]) * Math.PI * 2
+                }); })
+            .transition().duration(500)
+            .attr("fill", function(d) { return d["color"]; })
+
+        g.selectAll(".path")
+            .data(data["votes"])
+            .enter().append("line")
+            .attr("transform", "translate(300,300)")
+            .attr("x1", function(d) { return Math.sin((d["start"] + d["percent"] / 2) * Math.PI * 2) * (radius + 10); })
+            .attr("y1", function(d) { return - Math.cos((d["start"] + d["percent"] / 2) * Math.PI * 2) * (radius + 10); })
+            .attr("x2", function(d) { return Math.sin((d["start"] + d["percent"] / 2) * Math.PI * 2) * 250 })
+            .attr("y2", function(d) { return - Math.cos((d["start"] + d["percent"] / 2) * Math.PI * 2) * 250 })
+            .attr("stroke", "black")
+            .attr("stroke-width", 1)
+
+        g.selectAll(".text")
+            .data(data["votes"])
+            .enter().append("text")
+            .attr("transform", function(d) {
+                var x = 300 + Math.sin((d["start"] + d["percent"] / 2 + 0.003) * Math.PI * 2) * 255
+                var y = 300 - Math.cos((d["start"] + d["percent"] / 2 + 0.003) * Math.PI * 2) * 255
+                var theta = (d["start"] + d["percent"] / 2) * 360 - 90
+                return "translate(" + x + "," + y + ") rotate(" +  theta + ")"; })
+            .attr("x", 0)
+            .attr("y", 0)
+            .text( function(d) { return d["candidate"]; })
+            .attr("text-anchor", "begin")
+            .attr("font-size", "12px")
+
+            function onMouseOverPie(d, i) {
+                d3.select(this)
+                    .transition().duration(500)
+                    .attr("d", function(d) {
+                        return arc({
+                        innerRadius: 0,
+                        outerRadius: radius + 10,
+                        startAngle: d["start"] * Math.PI * 2,
+                        endAngle: (d["start"] + d["percent"]) * Math.PI * 2
+                        }); })
+
+                g.append("text")
+                    .attr("class", "pie_value")
+                    .attr("x", 0)
+                    .attr("y", 240)
+                    .text( function() { return d["candidate"] + ": " + d["no"]; })
+                    .attr("font-size", "20px")
+                    .attr("text-anchor", "end")
+
+                g.append("text")
+                    .attr("class", "pie_value")
+                    .attr("x", 0)
+                    .attr("y", 270)
+                    .text( function() { return (d["percent"] * 100).toFixed(4) + " %"; })
+                    .attr("font-size", "20px")
+                    .attr("text-anchor", "end")
+            }
+
+            function onMouseOutPie(d, i) {
+                d3.select(this)
+                    .transition().duration(500)
+                    .attr("d", function(d) {
+                        return arc({
+                        innerRadius: 0,
+                        outerRadius: radius,
+                        startAngle: d["start"] * Math.PI * 2,
+                        endAngle: (d["start"] + d["percent"]) * Math.PI * 2
+                        }); })
+
+                d3.selectAll(".pie_value")
+                    .remove()
+            }
+    }
+
+    function create_chart() {
+        svg.append("text")
+            .attr("class", "county_text")
+            .attr("x", side_margin + g_width / 2)
+            .attr("y", 100)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "36px")
+            .text(florida_votes[county_idx]["county"] + " county - " +
+                florida_votes[county_idx]["total"] + " votes")
+        if(is_bar_chart) {
+            create_bar_chart()
+        }
+        else {
+            create_pie_chart()
+        }
+    }
+
+    function erase_chart() {
+        d3.selectAll(".county_text")
+            .remove()
+        d3.selectAll(".pie_chart")
+            .remove()
+        d3.selectAll(".bar_chart")
+            .remove()
+    }
+
+    var is_bar_chart = true
+    create_chart()
+
+
+    // control panel 500 * 800
+    var g2 = svg.append("g")
+        .attr("transform", "translate(900,0)")
+
+    g2.append("g")
+        .append("polygon")
+        .call(d3.drag().on("drag", onMouseDragWidthBar))
+        .on("click", onMouseClickWidthBar)
+        .attr("points", "0,135 200,125 200,175 0,165")
+        .attr("fill", "#CC99FF")
+
+    g2.append("g")
+        .append("text")
+        .attr("x", 100)
+        .attr("y", 110)
+        .text("drag to adjust bar width")
+        .attr("text-anchor", "middle")
+
+    g2.append("g")
+        .append("text")
+        .attr("x", 100)
+        .attr("y", 200)
+        .text("click to resume default")
+        .attr("text-anchor", "middle")
+
+    var arc = d3.arc()
+
+    g2.append("g")
+        .append("path")
+        .on("click", onMouseClickSwitchPie)
+        .attr("transform", "translate(350,150)")
+        .attr("d", arc({ innerRadius: 0, outerRadius: 50,
+            startAngle: 0, endAngle: -0.6 }))
+        .attr("fill", "#FF3333")
+
+    g2.append("g")
+        .append("path")
+        .on("click", onMouseClickSwitchPie)
+        .attr("transform", "translate(350,150)")
+        .attr("d", arc({ innerRadius: 0, outerRadius: 50,
+            startAngle: -0.6, endAngle: -2.5 }))
+        .attr("fill", "#0077FF")
+
+    g2.append("g")
+        .append("path")
+        .on("click", onMouseClickSwitchPie)
+        .attr("transform", "translate(350,150)")
+        .attr("d", arc({ innerRadius: 0, outerRadius: 50,
+            startAngle: -2.5, endAngle: -Math.PI }))
+        .attr("fill", "#9933FF")
+
+    g2.append("g")
+        .append("polygon")
+        .on("click", onMouseClickSwitchBar)
+        .attr("points", "350,100 370,100 370,125 350,125 350,150 380,150 380,175 350,175")
+        .attr("fill", "#0099FF")
+
+    g2.append("g")
+        .append("polygon")
+        .on("click", onMouseClickSwitchBar)
+        .attr("points", "350,125 400,125 400,150 350,150 350,175 360,175 360,200 350,200")
+        .attr("fill", "#33FFFF")
+
+    g2.append("g")
+        .append("text")
+        .attr("x", 350)
+        .attr("y", 220)
+        .text("switch charts")
+        .attr("text-anchor", "middle")
+
+    function onMouseDragWidthBar(d, i) {
+        bar_width_new = Math.min(200, Math.max(10, d3.event.x)) * bar_width / 180.0
+        d3.selectAll(".bar")
+            .transition().duration(100)
+            .attr("x", function(d) { return d["index"] * 60 + 30 - (bar_width_new + 10) / 2; })
+            .attr("width", (bar_width_new + 10))
+    }
+
+    function onMouseClickWidthBar(d, i) {
+        d3.selectAll(".bar")
+            .transition().duration(500)
+            .attr("x", function(d) { return d["index"] * 60 + 30 - bar_width / 2; })
+            .attr("width", bar_width)
+    }
+
+    function onMouseClickSwitchBar(d, i) {
+        erase_chart()
+        is_bar_chart = true
+        create_chart()
+    }
+
+    function onMouseClickSwitchPie(d, i) {
+        erase_chart()
+        is_bar_chart = false
+        create_chart()
+    }
+
+
+    function create_florida_map() {
+        var projection = d3.geoAlbers()
+            .scale(4000)
+            .translate([-600,-200])
+        var path = d3.geoPath().projection(projection)
+
+        d3.json("floridacounties.json", function(error, florida) {
+            if(error) {
+                throw error
+            }
+
+            g2.append("g")
+                .attr("transform", "rotate(5)")
+                .selectAll("county")
+                .data(topojson.feature(florida, florida.objects.cb_2015_florida_county_20m).features)
+                .enter().append("path")
+                .attr("class", "county")
+                .on("click", onMouseClickCounty)
+                .attr("d", path)
+                .attr("fill", function(d) { if(d.properties.NAME === "Alachua") return "#0077FF"; else return "#999999"; })
+                .attr("stroke", "#FFFFFF")
+
+            g2.append("g")
+                .append("text")
+                .attr("x", 80)
+                .attr("y", 600)
+                .text("click on map to select county")
+                .attr("text-anchor", "middle")
+
+            function onMouseClickCounty(d, i) {
+                var county_name = d.properties.NAME.toUpperCase()
+                for(var i = 0; i < florida_votes.length; i ++) {
+                    if(florida_votes[i]["county"] === county_name) {
+                        county_idx = i
+                        break
+                    }
+                }
+                erase_chart()
+                create_chart()
+
+                d3.selectAll(".county")
+                    .attr("fill", function(c) { return "#999999" })
+                d3.select(this)
+                    .attr("fill", function() {
+                        if(florida_votes[county_idx]["votes"][0]["no"] > florida_votes[county_idx]["votes"][1]["no"]) {
+                            return "#0077FF"
+                        }
+                        else {
+                            return "#FF3333"
+                        } })
+            }
+        })
+    }
+
+    create_florida_map()
+
+</script>
+
+<p>Read more about <a href="https://simple.wikipedia.org/wiki/United_States_presidential_election,_2000">2000 US presidential election</a> and <a href="https://en.wikipedia.org/wiki/Bush_v._Gore">Bush v. Gore</a>. Voting data downloaded from <a href="https://vincentarelbundock.github.io/Rdatasets/datasets.html">Rdatasets</a> [<a href="https://vincentarelbundock.github.io/Rdatasets/csv/carData/Florida.csv">CSV</a> and <a href="https://vincentarelbundock.github.io/Rdatasets/doc/carData/Florida.html">Description</a>]. Florida counties map downloaded from <a href="https://github.com/deldersveld/topojson/tree/master/countries/us-states">topojson</a>.</p>
+
+<!-- https://trac.ffmpeg.org/wiki/Capture/Desktop -->
+
+</body>
+</html>

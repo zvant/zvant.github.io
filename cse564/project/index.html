@@ -1,0 +1,813 @@
+<!doctype html>
+<!--
+     author: Zekun Zhang
+      email: zekun.zhang@stonybrook.edu
+    created: April. 2019
+-->
+<html>
+<title>Climate Change Visualization</title>
+<head>
+<script src="https://d3js.org/d3.v4.js"></script>
+<script src="https://d3js.org/topojson.v1.js"></script>
+<script src="https://d3js.org/d3-geo-projection.v2.js"></script>
+<script src="https://d3js.org/queue.v1.js"></script>
+<script src="https://d3js.org/d3-scale-chromatic.v1.js"></script>
+</head>
+
+<body>
+<svg width="1400" height="1600"></svg>
+<script>
+
+var svg = d3.select("svg")
+var svg_width = svg.attr("width")
+var svg_height = svg.attr("height")
+
+function draw_bbox() {
+    svg.append("line")
+        .attr("x1", 0).attr("y1", 0)
+        .attr("x2", svg_width).attr("y2", 0)
+        .attr("stroke-width", 5)
+        .attr("stroke", "black")
+    svg.append("line")
+        .attr("x1", 0).attr("y1", 0)
+        .attr("x2", 0).attr("y2", svg_height)
+        .attr("stroke-width", 5)
+        .attr("stroke", "black")
+    svg.append("line")
+        .attr("x1", svg_width).attr("y1", svg_height)
+        .attr("x2", svg_width).attr("y2", 0)
+        .attr("stroke-width", 5)
+        .attr("stroke", "black")
+    svg.append("line")
+        .attr("x1", svg_width).attr("y1", svg_height)
+        .attr("x2", 0).attr("y2", svg_height)
+        .attr("stroke-width", 5)
+        .attr("stroke", "black")
+    svg.append("line")
+        .attr("x1", svg_width).attr("y1", 900)
+        .attr("x2", 0).attr("y2", 900)
+        .attr("stroke-width", 5)
+        .attr("stroke", "black")
+}
+// draw_bbox()
+
+var projection = d3.geoNaturalEarth2()
+                   .rotate([0, 0])
+                   .scale(svg_width / 2 / Math.PI * 0.9)
+                   .translate([svg_width / 2, 900 / 2 - 100])
+var path = d3.geoPath(projection)
+
+var temp_grid = null
+queue()
+    .defer(d3.json, 'air_temp_grid.json')
+    .await(load_temp_grid)
+function load_temp_grid(error, temps) {
+    if(error) {
+        throw error
+    }
+    temp_grid = temps
+    console.log("grid temperature loaded")
+    console.log(temp_grid['meta'])
+    // land background
+    d3.json("topojson_world_atlas_ocean_name_110m.json", function(error, world) {
+        if(error) {
+            throw error
+        }
+        svg.append("g")
+            .selectAll("land")
+            .data(topojson.feature(world, world.objects.land).features)
+            .enter().append("path")
+            .attr("class", "land")
+            .attr("d", path)
+            .attr("fill", "none")
+            .attr("stroke", "#000000")
+    })
+}
+
+var tmin_plot = -2
+var tmax_plot = 3
+var ymin = 1880
+var ymax = 2016
+
+function create_grid(year) {
+    svg.selectAll(".temperature_grid").remove()
+
+    svg.append("text")
+        .attr("class", "temperature_grid")
+        .attr("x", svg_width / 2).attr("y", 36)
+        .attr("text-anchor", "middle")
+        .text(year + " Annually Average Temperture Anomaly (℃) vs. 1951-1980")
+        .attr("font-size", "30px")
+
+    var tmin = temp_grid['meta']['tmin']
+    var tmax = temp_grid['meta']['tmax']
+    var tmean = temp_grid['meta']['tmean']
+    var tsd = temp_grid['meta']['tsd']
+    year -= 1880
+    var opacity = 0.85
+
+    function getcolor(t) {
+        if(t > tmax) {
+            return "#999999"
+        } else {
+            t = 0.5 - t / (10 * tsd)
+            return d3.interpolateRdBu(t)
+        }
+    }
+
+    var bar_width = 30
+    var bar_height = 20
+    var bar_y = 675
+    var legends = Array.from({length: 38}, (x, i) => i * 0.2 - 3.7)
+    var legends_width = (legends.length - 1) * bar_width
+    var axis = d3.scaleLinear()
+        .range([0, legends_width])
+        .domain([legends[0], legends[legends.length - 1]])
+
+    svg.append("g")
+        .attr("class", "temperature_grid")
+        .attr("transform", "translate(" + (svg_width - legends_width) / 2 + "," + bar_y + ")")
+        .call(d3.axisBottom(axis)
+                .tickValues(legends)
+                .tickFormat(d3.format("1"))
+        )
+
+    for(var i = 0; i < legends.length - 1; i ++) {
+        svg.append("rect")
+            .attr("class", "temperature_grid")
+            .attr("fill", getcolor((legends[i] + legends[i + 1]) / 2))
+            .attr("opacity", opacity)
+            .attr("x", (svg_width - legends_width) / 2 + bar_width * i)
+            .attr("y", bar_y - bar_height)
+            .attr("width", bar_width)
+            .attr("height", bar_height)
+    }
+
+    svg.selectAll("polygon")
+        .data(temp_grid['grid']).enter()
+        .append("polygon")
+        .attr("class", "temperature_grid")
+        .attr("points", function(d) {
+            pts = [
+                [d[0][0], d[0][1]],
+                [d[0][0], d[0][3]],
+                [d[0][2], d[0][3]],
+                [d[0][2], d[0][1]]
+            ]
+            return pts.map(projection).join(" ")
+        })
+        .attr("stroke-width", 0)
+        .attr("opacity", opacity)
+        .attr("fill", function(d) {
+            return getcolor(d[1][year])
+        })
+}
+
+var selection_poly = {
+    lat1 : 0,
+    lon1 : 0,
+    lat2 : 0,
+    lon2 : 0,
+    Ymin : projection([0, 89.9])[1],
+    Ymax : projection([0, -89.9])[1],
+    Xmin : projection([-179.9, 0])[0],
+    Xmax : projection([179.9, 0])[0],
+    poly : null,
+
+    plot : function() {
+        var lat1 = Math.min(this.lat1, this.lat2)
+        var lat2 = Math.max(this.lat1, this.lat2)
+        var lon1 = Math.min(this.lon1, this.lon2)
+        var lon2 = Math.max(this.lon1, this.lon2)
+        console.log("plot (" + lon1 + "," + lat1 + ") - (" + lon2 + "," + lat2 + ")")
+        var temps = []
+        var weights = []
+        for(var i = 0; i < temp_grid.grid.length; i ++) {
+            var rect = temp_grid.grid[i][0]
+            if((rect[0] > lon1 && rect[0] < lon2 && rect[1] > lat1 && rect[1] < lat2) ||
+                (rect[0] > lon1 && rect[0] < lon2 && rect[3] > lat1 && rect[3] < lat2) ||
+                (rect[2] > lon1 && rect[2] < lon2 && rect[3] > lat1 && rect[3] < lat2) ||
+                (rect[2] > lon1 && rect[2] < lon2 && rect[1] > lat1 && rect[1] < lat2)) {
+                // console.log(i, rect)
+                temps.push(temp_grid.grid[i][1])
+                weights.push(Math.cos(rect[1] / 180 * Math.PI))
+            }
+        }
+        console.log(temps.length + " grids / 16200")
+
+        var temps_year = []
+        for(var yr = 0; yr < temp_grid.grid[0][1].length; yr ++) {
+            var t = 0
+            var w_sum = 0
+            for(var i = 0; i < weights.length; i ++) {
+                if(temps[i][yr] < 100) {
+                    w_sum += weights[i]
+                    t += temps[i][yr] * weights[i]
+                }
+            }
+            if(t !== 0) {
+                t /= w_sum
+                temps_year.push({"yr": yr + ymin, "t": t})
+            }
+        }
+        // console.log(temps_year)
+
+        var xscale = d3.scaleLinear().range([0, 1200]).domain([ymin, ymax])
+        var yscale = d3.scaleLinear().range([160, 0]).domain([tmin_plot, tmax_plot])
+
+        for(var i = 0; i < temps_year.length - 1; i ++) {
+            var x1 = xscale(temps_year[i].yr)
+            var y1 = yscale(temps_year[i].t)
+            var x2 = xscale(temps_year[i + 1].yr)
+            var y2 = yscale(temps_year[i + 1].t)
+            var duration = 10
+            svg.append("line")
+                .attr("class", "selection_poly")
+                .attr("pointer-events", "none")
+                .attr("transform", "translate(100,710)")
+                .attr("x1", x1).attr("y1", y1).attr("x2", x1).attr("y2", y1)
+                .transition()
+                .delay(duration * i)
+                .duration(duration)
+                .attr("x1", x1).attr("y1", y1).attr("x2", x2).attr("y2", y2)
+                .attr("stroke", "green")
+                .attr("stroke-width", 2)
+        }
+    },
+
+    reset : function() {
+        console.log("reset selection")
+        this.lat1 = 0
+        this.lat2 = 0
+        this.lon1 = 0
+        this.lon2 = 0
+        svg.selectAll(".selection_poly").remove()
+
+        this.poly = svg.append("polygon")
+            .attr("class", "selection_poly")
+            .attr("points", "0,0 1,1")
+            .attr("fill", "#00FF00")
+            .attr("fill-opacity", 0.15)
+            .attr("stroke", "#00FF00")
+            .attr("stroke-width", 2)
+            .attr("stroke-opacity", 1)
+            .on("click", function() {
+                svg.selectAll(".selection_poly").remove()
+            })
+        this.boundary = svg.append("text")
+            .attr("class", "selection_poly")
+            .attr("pointer-events", "none")
+            .attr("x", 0).attr("y", 0)
+            .attr("font-size", 0)
+            .attr("text-anchor", "middle")
+    },
+
+    update_start : function(X, Y) {
+        this.reset()
+        X = Math.min(this.Xmax, Math.max(this.Xmin, X))
+        Y = Math.min(this.Ymax, Math.max(this.Ymin, Y))
+        var LL = projection.invert([X, Y])
+        this.lat1 = LL[1]
+        this.lon1 = LL[0]
+    },
+    update_end : function(X, Y) {
+        X = Math.min(this.Xmax, Math.max(this.Xmin, X))
+        Y = Math.min(this.Ymax, Math.max(this.Ymin, Y))
+        var LL = projection.invert([X, Y])
+        this.lat2 = LL[1]
+        this.lon2 = LL[0]
+        this.update_poly()
+    },
+    update_poly : function() {
+        var lat1 = Math.min(this.lat1, this.lat2)
+        var lat2 = Math.max(this.lat1, this.lat2)
+        var lon1 = Math.min(this.lon1, this.lon2)
+        var lon2 = Math.max(this.lon1, this.lon2)
+        lat1 = 2 * Math.floor(Math.abs(lat1) / 2) * Math.sign(lat1)
+        lat2 = 2 * Math.floor(Math.abs(lat2) / 2) * Math.sign(lat2)
+        lon1 = 2 * Math.floor(Math.abs(lon1) / 2) * Math.sign(lon1)
+        lon2 = 2 * Math.floor(Math.abs(lon2) / 2) * Math.sign(lon2)
+        // console.log(lat1, lat2, lon1, lon2)
+
+        var vertices = []
+        for(var lat = lat1; lat <= lat2; lat += 2) {
+            vertices.push([lon1, lat])
+        }
+        for(var lat = lat2; lat >= lat1; lat -= 2) {
+            vertices.push([lon2, lat])
+        }
+        this.poly.attr("points", vertices.map(projection).join(" "))
+
+        var XY_1 = projection([lon1, lat1])
+        var XY_2 = projection([lon2, lat2])
+        var latText = function (lat) {
+            if(lat < 0) {
+                return Math.abs(lat) + 'S'
+            } else {
+                return Math.abs(lat) + 'N'
+            }
+        }
+        var lonText = function (lon) {
+            if(lon < 0) {
+                return Math.abs(lon) + 'W'
+            } else {
+                return Math.abs(lon) + 'E'
+            }
+        }
+        var lat1_text = latText(lat1)
+        var lat2_text = latText(lat2)
+        var lon1_text = lonText(lon1)
+        var lon2_text = lonText(lon2)
+        var percentage = 0.5 * (Math.sin(lat1 / 180 * Math.PI) - Math.sin(lat2 / 180 * Math.PI)) * (lon1 - lon2) / 360
+        percentage = Math.round(10000 * percentage) / 100
+        var text = lat1_text + " - " + lat2_text + " × " + lon1_text + " - " + lon2_text + " (" + percentage + "%)"
+        this.boundary
+            .attr("x", (XY_1[0] + XY_2[0]) / 2)
+            .attr("y", (XY_1[1] + XY_2[1]) / 2)
+            .attr("font-size", 11)
+            .text(text)
+    }
+}
+
+function create_selection_layer() {
+    var vertices = []
+    for(var lat = -90; lat <= 90; lat += 5) {
+        vertices.push([-179.9, lat])
+    }
+    for(var lat = 90; lat >= -90; lat -= 5) {
+        vertices.push([179.9, lat])
+    }
+
+    selection_poly.reset()
+
+    svg.append("polygon")
+        .attr("fill", "#00FF00")
+        .attr("opacity", 0)
+        .attr("points", vertices.map(projection).join(" "))
+        .call(d3.drag()
+            .on("start", function() {
+                var XY = d3.mouse(this)
+                selection_poly.update_start(XY[0], XY[1])
+            })
+            .on("drag", function () {
+                var XY = d3.mouse(this)
+                selection_poly.update_end(XY[0], XY[1])
+            })
+            .on("end", function() {
+                var XY = d3.mouse(this)
+                selection_poly.update_end(XY[0], XY[1])
+                selection_poly.plot()
+            })
+        )
+}
+
+function temperature_plot() {
+    var g_height = 190
+    var g_width = 1200
+    var bt_margin = 30
+    var g = svg.append("g")
+        .attr("class", "temperature_plot")
+        .attr("transform", "translate(" + ((svg_width - g_width) / 2) + "," + (900 - g_height) + ")")
+
+    var tmin = tmin_plot
+    var tmax = tmax_plot
+    var xscale = d3.scaleLinear().range([0, g_width]).domain([ymin, ymax])
+    var yscale = d3.scaleLinear().range([g_height - bt_margin, 0]).domain([tmin, tmax])
+
+    g.append("g")
+        .attr("transform", "translate(0," + (g_height - bt_margin) + ")")
+        .call(d3.axisBottom(xscale)
+            .tickValues(Array.from({length: 28}, (x, i) => i * 5 + 1880))
+            .tickFormat(d3.format("0"))
+        )
+        .selectAll("text")
+        .attr("x", 10).attr("y", 0)
+        .attr("dy", "2em")
+        // .attr("transform", "rotate(-90)")
+        .attr("text-anchor", "end")
+    g.append("g")
+        .call(d3.axisBottom(xscale).tickValues([]))
+    g.append("g")
+        .attr("transform", "translate(0," + (g_height - bt_margin) * (tmax / (tmax - tmin)) + ")")
+        .call(d3.axisBottom(xscale).tickValues([]))
+
+    g.append("g")
+        .call(d3.axisLeft(yscale))
+    g.append("g")
+        .attr("transform", "translate(" + g_width + ",0)")
+        .call(d3.axisLeft(yscale).tickValues([]))
+
+    g.append("text")
+        .attr("x", 10).attr("y", 20)
+        .text("Global Relative Average Temperture (℃)")
+    g.append("text")
+        .attr("x", g_width - 45).attr("y", g_height - 40)
+        .text("Year")
+
+    var temp_vs_year = {}
+    d3.csv("global_annual.csv", function(error, temps) {
+        if(error) {
+            throw error
+        }
+        for(var i = 0; i < temps.length - 1; i ++) {
+            temp_vs_year[temps[i].year] = temps[i].t
+            var x1 = xscale(temps[i].year)
+            var y1 = yscale(temps[i].t)
+            var x2 = xscale(temps[i + 1].year)
+            var y2 = yscale(temps[i + 1].t)
+            var duration = 10
+            g.append("line")
+                .attr("x1", x1).attr("y1", y1).attr("x2", x1).attr("y2", y1)
+                .transition()
+                .delay(duration * i)
+                .duration(duration)
+                .attr("x1", x1).attr("y1", y1).attr("x2", x2).attr("y2", y2)
+                .attr("stroke", "red")
+                .attr("stroke-width", 2)
+        }
+        temp_vs_year[temps[temps.length - 1].year] = temps[temps.length - 1].t
+    })
+
+    g.append("rect")
+        .attr("x", 0).attr("y", 0)
+        .attr("width", g_width)
+        .attr("height", g_height - bt_margin)
+        .attr("fill", "blue")
+        .attr("opacity", 0)
+        .on("click", onMouseXGetYear)
+        .call(d3.drag().on("drag", onMouseXGetYear))
+
+    function onMouseXGetYear(d, i) {
+        g_X = d3.mouse(this)[0]
+        var year = Math.round(g_X / g_width * (ymax - ymin) + ymin)
+        year = Math.min(ymax, Math.max(ymin, year))
+        t = temp_vs_year[year]
+
+        g.selectAll(".year_indicator").remove()
+        g.append("line")
+            .attr("class", "year_indicator")
+            .attr("x1", xscale(year)).attr("y1", 0)
+            .attr("x2", xscale(year)).attr("y2", g_height - bt_margin)
+            .attr("stroke", "green")
+            .attr("stroke-width", 1)
+            .attr("pointer-events", "none")
+        g.append("circle")
+            .attr("class", "year_indicator")
+            .attr("cx", xscale(year))
+            .attr("cy", yscale(t))
+            .attr("r", 3)
+            .attr("stroke", "green")
+            .attr("stroke-width", 2)
+            .attr("fill", "none")
+            .attr("pointer-events", "none")
+        g.append("text")
+            .attr("class", "year_indicator")
+            .attr("x", 10).attr("y", 40)
+            .text("Year " + year + "  " + t + "℃")
+
+        create_grid(year)
+        create_selection_layer()
+    }
+}
+
+temperature_plot()
+
+function create_map() {
+    d3.json("topojson_world_atlas_ocean_name_110m.json", function(error, world) {
+        if(error) {
+            throw error
+        }
+
+        var g = svg.append("g")
+            .attr("transform", "translate(0,950)")
+
+        g.append("text")
+            .attr("x", svg_width / 2).attr("y", 35)
+            .attr("text-anchor", "middle")
+            .text("Causes and Influence")
+            .attr("font-size", "30px")
+
+        g.selectAll("ocean")
+            .data(topojson.feature(world, world.objects.ocean).features)
+            .enter().append("path")
+            .attr("class", "ocean")
+            .attr("d", path)
+            .attr("fill", "#00FFFF")
+
+        g.append("g")
+            .selectAll("country")
+            .data(topojson.feature(world, world.objects.countries).features)
+            .enter().append("path")
+            .attr("class", "country")
+            .on("click", onMouseClickCounty)
+            .attr("d", path)
+            .attr("fill", colorFill)
+            .attr("stroke", colorFill)
+
+        function colorFill(d, i) {
+            var polar = ["010", "304"]
+            var amazon = ["076"]
+            var sahara = ["504", "818", "012", "434", "788", "478", "732", "729", "562", "148", "466"]
+            var populate = ["156", "158", "356", "360", "104", "524", "050", "458",
+                "418", "064", "704", "764", "116", "144", "408", "410", "392", "608", "096"]
+            var opec = ["682", "368", "364", "784", "414", "634"]
+
+            for(var idx = 0; idx < polar.length; idx ++) {
+                if(d.id === polar[idx]) {
+                    d.type = "polar"
+                    return "#FFFFFF"
+                }
+            }
+            for(var idx = 0; idx < amazon.length; idx ++) {
+                if(d.id === amazon[idx]) {
+                    d.type = "amazon"
+                    return "#00CC00"
+                }
+            }
+            for(var idx = 0; idx < sahara.length; idx ++) {
+                if(d.id === sahara[idx]) {
+                    d.type = "sahara"
+                    return "#BDB76B"
+                }
+            }
+            for(var idx = 0; idx < populate.length; idx ++) {
+                if(d.id === populate[idx]) {
+                    d.type = "populate"
+                    return "#AA0000"
+                }
+            }
+            for(var idx = 0; idx < opec.length; idx ++) {
+                if(d.id === opec[idx]) {
+                    d.type = "opec"
+                    return "#202020"
+                }
+            }
+            d.type = null
+            return "#999999"
+        }
+
+        function onMouseClickRemovePopups(d, i) {
+            d3.selectAll(".popup").remove()
+        }
+
+        function cyclicLineChart() {
+            // cyclic graph for monthly arctic ice volume 1979-2018
+            g.append("rect")
+                .attr("class", "popup")
+                .attr("x", 0).attr("y", 0)
+                .attr("width", 1400)
+                .attr("height", 650)
+                .attr("fill", "#FFFFFF")
+                .on("click", onMouseClickRemovePopups)
+            g.append("text")
+                .attr("class", "popup")
+                .attr("pointer-events", "none")
+                .attr("x", svg_width / 2).attr("y", 35)
+                .attr("text-anchor", "middle")
+                .text("The Melting Spiral of Arctic Ice Sheet")
+                .attr("font-size", "30px")
+
+            var months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sept", "oct", "nov", "dec"]
+            var spiral_R = 250
+            var x0 = 700
+            var y0 = 350
+            var vmax = 31
+
+            for(var i = 0; i < months.length; i ++) {
+                g.append("line")
+                    .attr("class", "popup")
+                    .attr("pointer-events", "none")
+                    .attr("x1", x0).attr("y1", y0)
+                    .attr("x2", x0 + spiral_R * Math.sin((i + 1) * Math.PI / 6))
+                    .attr("y2", y0 - spiral_R * Math.cos((i + 1) * Math.PI / 6))
+                    .attr("stroke", "#000000")
+                    .attr("stroke-width", 1)
+                g.append("text")
+                    .attr("class", "popup")
+                    .attr("pointer-events", "none")
+                    .attr("x", x0 + (spiral_R + 21) * Math.sin((i + 1) * Math.PI / 6))
+                    .attr("y", y0 - (spiral_R + 21) * Math.cos((i + 1) * Math.PI / 6))
+                    .text(months[i].toUpperCase())
+                    .attr("text-anchor", "middle")
+                    .attr("font-size", "16px")
+            }
+
+            for(var v = 5; v <= vmax; v += 5) {
+                g.append("circle")
+                    .attr("class", "popup")
+                    .attr("pointer-events", "none")
+                    .attr("cx", x0).attr("cy", y0)
+                    .attr("r", spiral_R * v / vmax)
+                    .attr("fill", "none")
+                    .attr("stroke", "#000000")
+                    .attr("stroke-width", 1)
+                    .attr("stroke-dasharray", ("5,5"))
+            }
+            var ticks = [[10, "10"], [20, "20"], [30, "30 × 1000 km³"]]
+            for(var i = 0; i < ticks.length; i ++) {
+                g.append("text")
+                    .attr("class", "popup")
+                    .attr("pointer-events", "none")
+                    .attr("x", x0 + 5)
+                    .attr("y", y0 - spiral_R * (ticks[i][0] / vmax) + 4)
+                    .text(ticks[i][1])
+                    .attr("text-anchor", "left")
+                    .attr("font-size", "12px")
+            }
+
+            d3.json("arctic_ice_vol.json", function(error, volumes) {
+                if(error) {
+                    throw error
+                }
+                // console.log(volumes)
+                years = volumes.vol
+                for(var i = 0; i < years.length; i ++) {
+                    for(var m = 0; m < months.length; m ++) {
+                        var v1 = years[i][months[m]]
+                        var v2 = null
+                        if(m < months.length - 1) {
+                            v2 = years[i][months[m + 1]]
+                        } else {
+                            if(i < years.length - 1) {
+                                v2 = years[i + 1][months[0]]
+                            } else {
+                                break
+                            }
+                        }
+                        var x1 = x0 + spiral_R * (v1 / vmax) * Math.sin((m + 1) * Math.PI / 6)
+                        var y1 = y0 - spiral_R * (v1 / vmax) * Math.cos((m + 1) * Math.PI / 6)
+                        var x2 = x0 + spiral_R * (v2 / vmax) * Math.sin((m + 2) * Math.PI / 6)
+                        var y2 = y0 - spiral_R * (v2 / vmax) * Math.cos((m + 2) * Math.PI / 6)
+                        var duration = 30
+                        g.append("line")
+                            .attr("class", "popup")
+                            .attr("pointer-events", "none")
+                            .attr("stroke", function(d) { return d3.interpolatePlasma(i / years.length); })
+                            .attr("stroke-width", 3)
+                            .attr("x1", x1).attr("y1", y1).attr("x2", x1).attr("y2", y1)
+                            .transition()
+                            .delay(duration * (i * months.length + m))
+                            .duration(duration)
+                            .attr("x1", x1).attr("y1", y1).attr("x2", x2).attr("y2", y2)
+                    }
+                    g.append("line")
+                        .attr("class", "popup")
+                        .attr("pointer-events", "none")
+                        .attr("x1", 1050).attr("y1", i * 25 + y0 - 3.5 * 25)
+                        .attr("x2", 1150).attr("y2", i * 25 + y0 - 3.5 * 25)
+                        .attr("stroke", function(d) { return d3.interpolatePlasma(i / years.length); })
+                        .attr("stroke-width", 3)
+                    g.append("text")
+                        .attr("class", "popup")
+                        .attr("pointer-events", "none")
+                        .attr("x", 1157).attr("y", i * 25 + y0 - 3.5 * 25 + 4)
+                        .text(years[i].year)
+                        .attr("text-anchor", "left")
+                        .attr("font-size", "14px")
+                }
+            })
+        }
+
+        function stackAreaChart() {
+            g.append("rect")
+                .attr("class", "popup")
+                .attr("x", 0).attr("y", 0)
+                .attr("width", 1400)
+                .attr("height", 650)
+                .attr("fill", "#FFFFFF")
+                .on("click", onMouseClickRemovePopups)
+            g.append("text")
+                .attr("class", "popup")
+                .attr("pointer-events", "none")
+                .attr("x", svg_width / 2).attr("y", 35)
+                .attr("text-anchor", "middle")
+                .text("The Carbon Emission Explosion")
+                .attr("font-size", "30px")
+
+            d3.json("co2_year_nation.json", function(error, emissions) {
+                if(error) {
+                    throw error
+                }
+
+                console.log(emissions.meta)
+                var ymin = emissions.meta.ymin
+                var ymax = emissions.meta.ymax
+                var max_em = emissions.meta.max
+
+                var xscale = d3.scaleLinear().range([0, 1000]).domain([ymin, ymax])
+                var yscale = d3.scaleLinear().range([500, 0]).domain([0, max_em])
+
+                emission_seq = []
+                for(var y = ymin; y <= ymax; y ++) {
+                    ems = {}
+                    for(var n = 0; n < emissions.meta.nations.length; n ++) {
+                        ems[emissions.meta.nations[n]] = emissions.e[n][y - ymin]
+                    }
+                    emission_seq.push(ems)
+                }
+                var stacked = d3.stack()
+                    .keys(emissions.meta.nations)
+                    (emission_seq)
+
+                g.append("g")
+                    .attr("class", "popup")
+                    .attr("pointer-events", "none")
+                    .attr("transform", "translate(200,600)")
+                    .call(d3.axisBottom(xscale)
+                        .tickValues(Array.from({length: 13}, (x, i) => i * 20 + 1760))
+                        .tickFormat(d3.format("0"))
+                    )
+                    .selectAll("text")
+                    .attr("x", 10).attr("y", 0)
+                    .attr("dy", "2em")
+                    .attr("text-anchor", "end")
+                g.append("g")
+                    .attr("class", "popup")
+                    .attr("pointer-events", "none")
+                    .attr("transform", "translate(200,100)")
+                    .call(d3.axisBottom(xscale).tickValues([]))
+
+                g.append("g")
+                    .attr("class", "popup")
+                    .attr("pointer-events", "none")
+                    .attr("transform", "translate(200,100)")
+                    .call(d3.axisLeft(yscale))
+                g.append("g")
+                    .attr("class", "popup")
+                    .attr("pointer-events", "none")
+                    .attr("transform", "translate(1200,100)")
+                    .call(d3.axisLeft(yscale).tickValues([]))
+
+                g.append("text")
+                    .attr("class", "popup")
+                    .attr("pointer-events", "none")
+                    .attr("x", 170).attr("y", 80)
+                    .text("Carbon Emission (× 10⁶ Tons of Carbon)")
+                g.append("text")
+                    .attr("class", "popup")
+                    .attr("pointer-events", "none")
+                    .attr("x", 1210).attr("y", 620)
+                    .text("Year")
+
+                g.selectAll(".path")
+                    .data(stacked).enter()
+                    .append("path")
+                    .attr("class", "popup")
+                    .attr("pointer-events", "none")
+                    .attr("transform", "translate(200,100)")
+                    .style("fill", function(d) { return d3.schemeCategory20[d.index]; } )
+                    .attr("d", d3.area()
+                                 .x(function(d, i) { return xscale(i + ymin); })
+                                 .y0(function(d) { return yscale(d[0]); })
+                                 .y1(function(d) { return yscale(d[1]); })
+                    )
+
+                g.append("rect")
+                    .attr("class", "popup")
+                    .attr("pointer-events", "none")
+                    .attr("fill", "#FFFFFF")
+                    .attr("x", 201).attr("y", 101)
+                    .attr("width", 999).attr("height", 499)
+                    .transition().duration(2000)
+                    .attr("x", 1199).attr("y", 101)
+                    .attr("width", 0).attr("height", 499)
+
+                for(var n = 0; n < emissions.meta.nations.length; n ++) {
+                    g.append("rect")
+                        .attr("class", "popup")
+                        .attr("pointer-events", "none")
+                        .attr("fill", d3.schemeCategory20[n])
+                        .attr("x", 300).attr("y", 155 + (emissions.meta.nations.length - 1 - n) * 30)
+                        .attr("width", 100).attr("height", 25)
+                    g.append("text")
+                        .attr("class", "popup")
+                        .attr("pointer-events", "none")
+                        .attr("x", 410).attr("y", 155 + (emissions.meta.nations.length - 1 - n) * 30 + 18)
+                        .text(emissions.meta.nations[n])
+                        .attr("text-anchor", "left")
+                }
+            })
+        }
+
+        function onMouseClickCounty(d, i) {
+            onMouseClickRemovePopups(null, null)
+            if(d.type === "polar") {
+                cyclicLineChart()
+            }
+            if(d.type === "populate" || d.type === "opec") {
+                stackAreaChart()
+            }
+            if(d.type === "amazon" || d.type === "sahara") {
+                console.log("TODO")
+            }
+        }
+    })
+}
+
+create_map()
+console.log("🍋🍎🍐🍇🍈🥦🍄🍒🍓🍅")
+
+</script>
+
+</body>
+</html>
